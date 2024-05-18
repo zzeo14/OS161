@@ -81,6 +81,10 @@ inititems(void)
 	}
 }
 
+static struct semaphore* NW;
+static struct semaphore* NE;
+static struct semaphore* SW;
+static struct semaphore* SE;
 
 void turnright(){
 
@@ -94,10 +98,6 @@ void gostraight(){
 
 }
 
-static struct semaphore* NW;
-static struct semaphore* NE;
-static struct semaphore* SW;
-static struct semaphore* SE;
 // 회전각을 임의의 방향으로 할당 -> 각에 따라 gostraight, turnright, turnleft 함수 호출
 static
 void
