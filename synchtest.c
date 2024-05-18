@@ -43,6 +43,12 @@
 #define NCVLOOPS      5
 #define NTHREADS      32
 
+// 차량 접근 위치
+#define NORTH 0
+#define SOUTH 1
+#define WEST 2
+#define EAST 3
+
 static volatile unsigned long testval1;
 static volatile unsigned long testval2;
 static volatile unsigned long testval3;
@@ -81,11 +87,12 @@ inititems(void)
 	}
 }
 
-static struct semaphore* NW;
-static struct semaphore* NE;
-static struct semaphore* SW;
-static struct semaphore* SE;
+//static struct semaphore* NW;
+//static struct semaphore* NE;
+//static struct semaphore* SW;
+//static struct semaphore* SE;
 
+/*
 void turnright(){
 
 }
@@ -97,62 +104,49 @@ void turnleft(){
 void gostraight(){
 
 }
+*/
 
 // 회전각을 임의의 방향으로 할당 -> 각에 따라 gostraight, turnright, turnleft 함수 호출
 static
 void
 semtestthread(void *junk, unsigned long num)
 {
-	int i;
 	(void)junk;
 
-	/*
-	 * Only one of these should print at a time.
-	 */
 	P(testsem);
-	kprintf("Thread %2lu: ", num);
-	for (i=0; i<NSEMLOOPS; i++) {
-		kprintf("%c", (int)num+64);
-	}
-	kprintf("\n");
+	if(num == NORTH) kprintf("    Car is at north\n");
+	else if(num == SOUTH) kprintf("    Car is at south\n");
+	else if(num == EAST) kprintf("    Car is at EAST\n");
+	else if(num == WEST) kprintf("    Car is at WEST\n");
 	V(donesem);
-}
+}        
 // P(semaphore) : semwait
 // V(semaphore) : semsignal
+
 int
 semtest(int nargs, char **args)
 {
+	(void)nargs; (void)args;
+	
 	int i, result;
-
-	(void)nargs;
-	(void)args;
-
 	inititems();
-	kprintf("Starting semaphore test...\n");
-	kprintf("If this hangs, it's broken: ");
-	P(testsem);
-	P(testsem);
-	kprintf("ok\n");
 
-	//define NTHREADS 32
-	for (i=0; i<NTHREADS; i++) {
-		result = thread_fork("semtest", NULL, semtestthread, NULL, i);
-		if (result) {
-			panic("semtest: thread_fork failed: %s\n",
-			      strerror(result));
+	P(testsem);
+	P(testsem);
+	for(i = 0 ; i < NTHREADS; i++){
+		kprintf("Car #: %d\n", i);	
+		result = thread_fork("semtest", NULL, semtestthread, NULL, i % 4);
+		if(result){
+			panic("i am Kim zeo");
 		}
 	}
 
-	for (i=0; i<NTHREADS; i++) {
+	for(i = 0 ; i < NTHREADS ; i++){
 		V(testsem);
 		P(donesem);
 	}
-
-	/* so we can run it again */
 	V(testsem);
 	V(testsem);
-
-	kprintf("Semaphore test done.\n");
 	return 0;
 }
 
