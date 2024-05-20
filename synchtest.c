@@ -21,6 +21,11 @@
 #define TURNLEFT 1
 #define TURNRIGHT 2
 
+// 차량 상태
+#define START 0
+#define GOING 1
+#define OUT 2
+
 static volatile unsigned long testval1;
 static volatile unsigned long testval2;
 static volatile unsigned long testval3;
@@ -30,54 +35,54 @@ static struct cv *testcv;
 static struct semaphore *donesem;
 
 // semaphore for assignment
-static struct semaphore* NW;
-static struct semaphore* NE;
-static struct semaphore* SW;
-static struct semaphore* SE;
-static struct semaphore* printsem;
+static struct semaphore* semNW;
+static struct semaphore* semNE;
+static struct semaphore* semSW;
+static struct semaphore* semSE;
+static struct semaphore* semprint;
 
 static
 void
 inititems(void)
 {
-	if (printsem == NULL){
-		printsem = sem_create("printsem", 1);
-		if(printsem == NULL){
+	if (semprint == NULL){
+		semprint = sem_create("printsem", 1);
+		if(semprint == NULL){
 			kprintf("Zeo Error");
 		}
 	}
-	if (NW == NULL){
-		NW = sem_create("NW", 1);
-		if(NW == NULL){
+	if (semNW == NULL){
+		semNW = sem_create("NW", 1);
+		if(semNW == NULL){
 			panic("Zeo Error");
 		}
 	}
-	if (NE == NULL){
-		NE = sem_create("NE", 1);
-		if(NE == NULL){
+	if (semNE == NULL){
+		semNE = sem_create("NE", 1);
+		if(semNE == NULL){
 			panic("Zeo Error");
 		}
 	}
-	if (SW == NULL){
-		SW = sem_create("SW", 1);
-		if(SW == NULL){
+	if (semSW == NULL){
+		semSW = sem_create("SW", 1);
+		if(semSW == NULL){
 			panic("Zeo Error");
 		}
 	}
-	if (SE == NULL){
-		SE = sem_create("SE", 1);
-		if(SE == NULL){
+	if (semSE == NULL){
+		semSE = sem_create("SE", 1);
+		if(semSE == NULL){
 			panic("Zeo Error");
 		}
 	}
 	if(testsem==NULL){
-		testem = sem_create("testsem", 2);
+		testsem = sem_create("testsem", 2);
 		if(testsem == NULL){
 			panic("synchtest: sem_create failed\n");
 		}
 	}
 	if(donesem==NULL){
-		testem = sem_create("donesem", 2);
+		donesem = sem_create("donesem", 2);
 		if(donesem == NULL){
 			panic("synchtest: sem_create failed\n");
 		}
@@ -98,33 +103,118 @@ inititems(void)
 
 static
 void 
-message_function(const char *from, const char *to, int car){
-	kprintf("    Car %d goes from %s to %s\n", car, from, to);	
+message_function(const char *from, const char *to, int car_num, int status){
+	P(semprint);
+	if(status == START){
+		kprintf("Car %d starts from %s\n", car_num, from);
+	}
+	else if(status == GOING) {
+		kprintf("Car %d goes from %s to %s\n", car_num, from, to);	
+	}
+	else if(status == OUT){
+		kprintf("Car %d goes out to %s\n", car_num, to);
+	}
+	V(semprint);
 }
 
 static
 void
 gostraight(int first_status, int car_num){
+	//temp
+	(void)first_status;
+	(void)car_num;
 
+	if(first_status == NORTH){
+	}
+	else if(first_status == SOUTH){
+	}
+	else if(first_status == EAST){
+	}
+	else if(first_status == WEST){
+	}
 }
 
 static
 void turnleft(int first_status, int car_num){
-	
+	//temp
+	(void)first_status;
+	(void)car_num;
+
+	if(first_status == NORTH){
+	}
+	else if(first_status == SOUTH){
+
+	}
+	else if(first_status == EAST){
+
+	}
+	else if(first_status == WEST){
+
+	}
 }
 
 
 
 static
 void turnright(int first_status, int car_num){
-}
+	if(first_status == NORTH){
+		P(semNW);
+		message_function("North", "", car_num, START);
+		message_function("North", "NW", car_num, GOING);
+		message_function("NW", "WEST", car_num, GOING);
+		message_function("", "West", car_num, OUT);
+		V(semNW);
+	}
+	else if(first_status == SOUTH){
+		P(semSE);
+		message_function("South", "", car_num, START);
+		message_function("South", "SE", car_num, GOING);
+		message_function("SE", "EAST", car_num, GOING);
+		message_function("", "East", car_num, OUT);
+		V(semSE);
+	}
+	else if(first_status == EAST){
+		P(semNE);
+		message_function("East", "", car_num, START);
+		message_function("EAST", "NE", car_num, GOING);
+		message_function("NE", "North", car_num, GOING);
+		message_function("", "North", car_num, OUT);
+		V(semNE);
+	}
+	else if(first_status == WEST){
+		P(semSW);
+		message_function("West", "", car_num, START);
+		message_function("WEST", "SW", car_num, GOING);
+		message_function("SW", "South", car_num, GOING);
+		message_function("", "South", car_num, OUT);	
+		V(semSW);
+	}
+}	
 
 static
 void
 semtestthread(void *junk, unsigned long num)
 {
 	(void)junk;
-	(void) num;
+
+	// 자동차 나타날 위치
+	int first_status = random() % 4; // 0: north, 1: south, 2: east, 3: west
+					 
+	// 자동차가 이동할 방향
+	//int direction = random() % 3; // 0: straight, 1: turn left, 2: turn right
+	//int direction = STRAIGHT;
+	int direction = TURNRIGHT;
+	//int direction = TURNLEFT;
+
+	if(direction == STRAIGHT){
+		gostraight(first_status, num);
+	}
+	else if(direction == TURNLEFT){
+		turnleft(first_status, num);	
+	}
+	else if(direction == TURNRIGHT){
+		turnright(first_status, num);
+	}
 
 }        
 
@@ -133,14 +223,6 @@ void
 makethreads(){
 	int i, result;
 	
-	// 자동차 나타날 위치
-	int first_status = random() % 4; // 0: north, 1: south, 2: east, 3: west
-					 
-	// 자동차가 이동할 방향
-	//int direction = random() % 3; // 0: straight, 1: turn left, 2: turn right
-	int direction = STRAIGHT;
-
-	kprintf("Car #: %ld, ", num);
 	for(i = 0 ; i < NTHREADS; i++){
 		result = thread_fork("semtest", NULL, semtestthread, NULL, i);
 		if(result){
@@ -155,8 +237,7 @@ semtest(int nargs, char **args)
 	(void)nargs; (void)args;
 
 	inititems();
-	makethreads();	
-
+	makethreads();
 	return 0;
 }
 
@@ -170,7 +251,6 @@ fail(unsigned long num, const char *msg)
 	lock_release(testlock);
 
 	V(donesem);
-	thread_exit();
 }
 
 static
