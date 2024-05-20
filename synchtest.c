@@ -1,36 +1,3 @@
-/*
- * Copyright (c) 2000, 2001, 2002, 2003, 2004, 2005, 2008, 2009
- *	The President and Fellows of Harvard College.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 3. Neither the name of the University nor the names of its contributors
- *    may be used to endorse or promote products derived from this software
- *    without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE UNIVERSITY AND CONTRIBUTORS ``AS IS'' AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED.  IN NO EVENT SHALL THE UNIVERSITY OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
- * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE.
- 
-
- *
- * Synchronization test code.
- */
-
 #include <types.h>
 #include <lib.h>
 #include <clock.h>
@@ -49,6 +16,11 @@
 #define WEST 2
 #define EAST 3
 
+// 차량 진행 방향
+#define STRAIGHT 0
+#define TURNLEFT 1
+#define TURNRIGHT 2
+
 static volatile unsigned long testval1;
 static volatile unsigned long testval2;
 static volatile unsigned long testval3;
@@ -57,96 +29,134 @@ static struct lock *testlock;
 static struct cv *testcv;
 static struct semaphore *donesem;
 
+// semaphore for assignment
+static struct semaphore* NW;
+static struct semaphore* NE;
+static struct semaphore* SW;
+static struct semaphore* SE;
+static struct semaphore* printsem;
+
 static
 void
 inititems(void)
 {
-	if (testsem==NULL) {
-		testsem = sem_create("testsem", 2);
-		if (testsem == NULL) {
+	if (printsem == NULL){
+		printsem = sem_create("printsem", 1);
+		if(printsem == NULL){
+			kprintf("Zeo Error");
+		}
+	}
+	if (NW == NULL){
+		NW = sem_create("NW", 1);
+		if(NW == NULL){
+			panic("Zeo Error");
+		}
+	}
+	if (NE == NULL){
+		NE = sem_create("NE", 1);
+		if(NE == NULL){
+			panic("Zeo Error");
+		}
+	}
+	if (SW == NULL){
+		SW = sem_create("SW", 1);
+		if(SW == NULL){
+			panic("Zeo Error");
+		}
+	}
+	if (SE == NULL){
+		SE = sem_create("SE", 1);
+		if(SE == NULL){
+			panic("Zeo Error");
+		}
+	}
+	if(testsem==NULL){
+		testem = sem_create("testsem", 2);
+		if(testsem == NULL){
 			panic("synchtest: sem_create failed\n");
 		}
 	}
-	if (testlock==NULL) {
+	if(donesem==NULL){
+		testem = sem_create("donesem", 2);
+		if(donesem == NULL){
+			panic("synchtest: sem_create failed\n");
+		}
+	}	
+	if(testlock==NULL){
 		testlock = lock_create("testlock");
-		if (testlock == NULL) {
+		if(testlock == NULL){
 			panic("synchtest: lock_create failed\n");
 		}
 	}
-	if (testcv==NULL) {
+	if(testcv==NULL){
 		testcv = cv_create("testlock");
-		if (testcv == NULL) {
-			panic("synchtest: cv_create failed\n");
-		}
-	}
-	if (donesem==NULL) {
-		donesem = sem_create("donesem", 0);
-		if (donesem == NULL) {
-			panic("synchtest: sem_create failed\n");
+		if(testcv == NULL){
+			panic("synchtest: sem_create failed");
 		}
 	}
 }
 
-//static struct semaphore* NW;
-//static struct semaphore* NE;
-//static struct semaphore* SW;
-//static struct semaphore* SE;
+static
+void 
+message_function(const char *from, const char *to, int car){
+	kprintf("    Car %d goes from %s to %s\n", car, from, to);	
+}
 
-/*
-void turnright(){
+static
+void
+gostraight(int first_status, int car_num){
 
 }
 
-void turnleft(){
-
+static
+void turnleft(int first_status, int car_num){
+	
 }
 
-void gostraight(){
 
+
+static
+void turnright(int first_status, int car_num){
 }
-*/
 
-// 회전각을 임의의 방향으로 할당 -> 각에 따라 gostraight, turnright, turnleft 함수 호출
 static
 void
 semtestthread(void *junk, unsigned long num)
 {
 	(void)junk;
+	(void) num;
 
-	P(testsem);
-	if(num == NORTH) kprintf("    Car is at north\n");
-	else if(num == SOUTH) kprintf("    Car is at south\n");
-	else if(num == EAST) kprintf("    Car is at EAST\n");
-	else if(num == WEST) kprintf("    Car is at WEST\n");
-	V(donesem);
 }        
-// P(semaphore) : semwait
-// V(semaphore) : semsignal
+
+static
+void
+makethreads(){
+	int i, result;
+	
+	// 자동차 나타날 위치
+	int first_status = random() % 4; // 0: north, 1: south, 2: east, 3: west
+					 
+	// 자동차가 이동할 방향
+	//int direction = random() % 3; // 0: straight, 1: turn left, 2: turn right
+	int direction = STRAIGHT;
+
+	kprintf("Car #: %ld, ", num);
+	for(i = 0 ; i < NTHREADS; i++){
+		result = thread_fork("semtest", NULL, semtestthread, NULL, i);
+		if(result){
+			panic("i am Kim zeo");
+		}
+	}
+}
 
 int
 semtest(int nargs, char **args)
 {
 	(void)nargs; (void)args;
-	
-	int i, result;
+
 	inititems();
+	makethreads();	
 
-	P(testsem);
-	P(testsem);
-	for(i = 0 ; i < NTHREADS; i++){
-		kprintf("Car #: %d\n", i);	
-		result = thread_fork("semtest", NULL, semtestthread, NULL, i % 4);
-		if(result){
-			panic("i am Kim zeo");
-		}
-	}
-
-	for(i = 0 ; i < NTHREADS ; i++){
-		V(testsem);
-		P(donesem);
-	}
-	V(testsem);
-	V(testsem);
 	return 0;
 }
 
