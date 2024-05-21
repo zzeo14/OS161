@@ -40,11 +40,18 @@ static struct semaphore* semNE;
 static struct semaphore* semSW;
 static struct semaphore* semSE;
 static struct semaphore* semprint;
+static struct semaphore* semthreads;
 
 static
 void
 inititems(void)
 {
+	if (semthreads == NULL){
+		semthreads = sem_create("semthreads", 0);
+		if(semthreads == NULL){
+			kprintf("semthreads error");
+		}
+	}
 	if (semprint == NULL){
 		semprint = sem_create("printsem", 1);
 		if(semprint == NULL){
@@ -120,35 +127,67 @@ message_function(const char *from, const char *to, int car_num, int status){
 static
 void
 gostraight(int first_status, int car_num){
-	//temp
-	(void)first_status;
-	(void)car_num;
+	if(first_status == NORTH){  // 북쪽은 SW 먹고 NW 먹기
+		P(semSW); 	
+			P(semNW);
+			message_function("North", "", car_num, START);
+			message_function("North", "NW", car_num, GOING);
+			V(semNW);
+		message_function("NW", "SW", car_num, GOING);
+		message_function("SW", "South", car_num, GOING);
+		message_function("", "South", car_num, OUT);
+		V(semSW);
 
-	if(first_status == NORTH){
 	}
-	else if(first_status == SOUTH){
+	else if(first_status == SOUTH){ // south는 NE 먹고 SE 먹기
+		P(semNE);
+			P(semSE);
+			message_function("South", "", car_num, START);
+			message_function("South", "SE", car_num, GOING);
+			V(semSE);
+		message_function("SE", "NE", car_num, GOING);
+		message_function("NE", "North", car_num, GOING);
+		message_function("", "North", car_num, OUT);
+		V(semNE);
 	}
-	else if(first_status == EAST){
+	else if(first_status == EAST){ // east는 NE 먹고 NW 먹기
+		P(semNE);
+		message_function("East", "", car_num, START);
+		message_function("East", "NE", car_num, GOING);
+		V(semNE);
+
+		P(semNW);
+		message_function("NE", "NW", car_num, GOING);
+		message_function("NW", "West", car_num, GOING);
+		message_function("", "West", car_num, OUT);
+		V(semNW);
 	}
-	else if(first_status == WEST){
+	else if(first_status == WEST){ // west는 SW먹고 SE 먹기
+		P(semSW);
+		message_function("West", "", car_num, START);
+		message_function("West", "SW", car_num, GOING);
+		V(semSW);
+
+		P(semSE);
+		message_function("SW", "SE", car_num, GOING);
+		message_function("SE", "East", car_num, GOING);
+		message_function("", "East", car_num, OUT);
+		V(semSE);
 	}
 }
 
 static
 void turnleft(int first_status, int car_num){
-	//temp
-	(void)first_status;
-	(void)car_num;
-
-	if(first_status == NORTH){
+	if(first_status == NORTH){ // SE먹고 SW 먹고 NW 먹기
+			
 	}
-	else if(first_status == SOUTH){
+	else if(first_status == SOUTH){ // NW 먹고 NE 먹고 SE 먹기
 
 	}
-	else if(first_status == EAST){
+	else if(first_status == EAST){ // NE 먹고 NW 먹고 SW 먹기
 
 	}
-	else if(first_status == WEST){
+	else if(first_status == WEST){ // SW 먹고 SE 먹고 NE 먹기
 
 	}
 }
@@ -202,8 +241,8 @@ semtestthread(void *junk, unsigned long num)
 					 
 	// 자동차가 이동할 방향
 	//int direction = random() % 3; // 0: straight, 1: turn left, 2: turn right
-	//int direction = STRAIGHT;
-	int direction = TURNRIGHT;
+	int direction = STRAIGHT;
+	//int direction = TURNRIGHT;
 	//int direction = TURNLEFT;
 
 	if(direction == STRAIGHT){
@@ -216,6 +255,7 @@ semtestthread(void *junk, unsigned long num)
 		turnright(first_status, num);
 	}
 
+	V(semthreads);
 }        
 
 static
@@ -238,6 +278,10 @@ semtest(int nargs, char **args)
 
 	inititems();
 	makethreads();
+
+	for(int i = 0 ; i < NTHREADS ; i++){
+		P(semthreads);
+	}
 	return 0;
 }
 
