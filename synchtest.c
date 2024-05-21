@@ -25,6 +25,7 @@
 #define START 0
 #define GOING 1
 #define OUT 2
+#define DIRECTION 3
 
 static volatile unsigned long testval1;
 static volatile unsigned long testval2;
@@ -112,7 +113,10 @@ static
 void 
 message_function(const char *from, const char *to, int car_num, int status){
 	P(semprint);
-	if(status == START){
+	if(status == DIRECTION){
+		kprintf("Car %d starts for %s\n", car_num, from);
+	}
+	else if(status == START){
 		kprintf("Car %d starts from %s\n", car_num, from);
 	}
 	else if(status == GOING) {
@@ -178,17 +182,67 @@ gostraight(int first_status, int car_num){
 
 static
 void turnleft(int first_status, int car_num){
-	if(first_status == NORTH){ // SE먹고 SW 먹고 NW 먹기
-			
+	if(first_status == NORTH){ // SW -> NW -> SE순으로 먹기  
+		P(semSW);
+			P(semNW);
+			message_function("North", "", car_num, START);
+			message_function("North", "NW", car_num, GOING);
+			V(semNW);
+		message_function("NW", "SW", car_num, GOING);
+		V(semSW);
+		
+		P(semSE);
+		message_function("SW", "SE", car_num, START);
+		message_function("SE", "East", car_num, GOING);
+		message_function("", "East", car_num, OUT);
+		V(semSE);		
 	}
-	else if(first_status == SOUTH){ // NW 먹고 NE 먹고 SE 먹기
-
+	else if(first_status == SOUTH){ // NE -> SE -> NW 순으로 먹기
+		P(semNE);
+			P(semSE);
+			message_function("South", "", car_num, START);
+			message_function("South", "SE", car_num, GOING);
+			V(semSE);
+		message_function("SE", "NE", car_num, GOING);
+		V(semNE);
+		
+		P(semNW);
+		message_function("NE", "NW", car_num, START);
+		message_function("NW", "West", car_num, GOING);
+		message_function("", "West", car_num, OUT);
+		V(semNW);		
 	}
-	else if(first_status == EAST){ // NE 먹고 NW 먹고 SW 먹기
+	else if(first_status == EAST){ // NE -> NW -> SW 순으로 먹기
+		P(semNE);
+		message_function("East", "", car_num, START);
+		message_function("East", "NE", car_num, GOING);
+		V(semNE);
 
+		P(semNW);
+		message_function("NE", "NW", car_num, GOING);		
+		V(semNW);
+
+		P(semSW);
+		message_function("NW", "SW", car_num, GOING);		
+		message_function("SW", "South", car_num, GOING);		
+		message_function("","South", car_num, OUT);
+		V(semSW);
 	}
-	else if(first_status == WEST){ // SW 먹고 SE 먹고 NE 먹기
+	else if(first_status == WEST){ // SW -> SE -> NE 순으로 먹기
+		P(semSW);
+		message_function("West", "", car_num, START);
+		message_function("West", "SW", car_num, GOING);
+		V(semSW);
 
+		P(semSE);
+		message_function("SW", "SE", car_num, GOING);		
+		V(semSE);
+
+		P(semNE);
+		message_function("SE", "NE", car_num, GOING);		
+		message_function("NE", "North", car_num, GOING);		
+		message_function("","North", car_num, OUT);
+		V(semNE);
 	}
 }
 
@@ -240,18 +294,21 @@ semtestthread(void *junk, unsigned long num)
 	int first_status = random() % 4; // 0: north, 1: south, 2: east, 3: west
 					 
 	// 자동차가 이동할 방향
-	//int direction = random() % 3; // 0: straight, 1: turn left, 2: turn right
-	int direction = STRAIGHT;
+	int direction = random() % 3; // 0: straight, 1: turn left, 2: turn right
+	//int direction = STRAIGHT;
 	//int direction = TURNRIGHT;
 	//int direction = TURNLEFT;
 
 	if(direction == STRAIGHT){
+		message_function("go straight", "", num, DIRECTION);	
 		gostraight(first_status, num);
 	}
 	else if(direction == TURNLEFT){
+		message_function("turn left", "", num, DIRECTION);
 		turnleft(first_status, num);	
 	}
 	else if(direction == TURNRIGHT){
+		message_function("turn right", "", num, DIRECTION);
 		turnright(first_status, num);
 	}
 
